@@ -1,0 +1,15 @@
+Weather::Product::NWS is a module for parsing National Weather Service (NWS)
+weather reports.
+
+The current version does not handle addendums or corrections to reports.
+
+Other limitations in handling WMO headers, AWIPS Product IDs or UGCs exist
+based on the limitations of Weather::WMO, Weather::PIL or Weather::UGC
+modules, respectively.
+
+Required Modules:
+	Carp
+	Weather::PIL
+	Weather::Product
+	Weather::UGC
+	Weather::WMO

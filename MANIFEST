@@ -2,4 +2,5 @@ Changes
 Makefile.PL
 MANIFEST
 NWS.pm
+README
 test.pl

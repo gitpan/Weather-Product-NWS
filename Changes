@@ -3,3 +3,5 @@ Revision history for Perl extension Weather::Product::NWS.
 1.0.0  Tue Jul 27 17:54:25 1999
         - original version
 
+1.0.1  Sat Jul 31 15:04:26 1999
+        - properly parses multi-line UGCs

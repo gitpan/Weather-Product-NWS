@@ -3,7 +3,7 @@ require 5.004;
 require Exporter;
 
 use vars qw($VERSION);
-$VERSION = "1.0.0";
+$VERSION = "1.0.1";
 
 @ISA = qw(Weather::Product);
 @EXPORT = qw();
@@ -36,7 +36,7 @@ sub new {
 sub parse {
     my $self = shift;
     my $product = shift;
-    my $line,
+    my $line, $line_last = '';
        $level = 0,
        $that;
 
@@ -51,6 +51,10 @@ sub parse {
 
         if ($level) {
             $self->{data}->{$this}->{text} .= $line."\n";
+        }
+
+        if (($level==2) and ($line_last =~ m/\-$/)) {
+            $line = $line_last . $line;
         }
 
         if (($level==3) and ($line =~ m/^\=|\$\$/)) {
@@ -112,6 +116,7 @@ sub parse {
             ++$level;
             $self->add($self->{WMO}->product, $this);
         }
+        $line_last = $line;
     }
 }
 
