@@ -5,3 +5,17 @@ Revision history for Perl extension Weather::Product::NWS.
 
 1.0.1  Sat Jul 31 15:04:26 1999
         - properly parses multi-line UGCs
+
+1.0.2  Sat Jul 31 23:46:12 1999
+        - parse reports w/UGC lines but no PI (AWIPS) lines
+        - fixed bug where first zone associated w/entire product
+          (when no PI line is specified)
+
+1.0.3  Tue Aug 10 05:56:16 1999
+        - added max_age property (inherited from Weather::Product)
+        - added expires method
+        - added purge method; purge will also remove expired reports
+        - garbage collection (using inherited purge method) after parsing
+        - removed pointer method, since this is inherited from
+          Weather::Product
+        - minor optimizations/weaks

@@ -2,25 +2,40 @@ package Weather::Product::NWS;
 require 5.004;
 require Exporter;
 
-use vars qw($VERSION);
-$VERSION = "1.0.1";
+=head1 NAME
+
+Weather::Product::NWS - routines for parsing NWS weather products
+
+=head1 DESCRIPTION
+
+Weather::Product::NWS is a module for parsing U.S. National Weather Service
+(NWS) weather products. Products can be fetched from local files, URLs, or
+parsed directly from pre-fetched data.
+
+Weather products are organized by zones and counties (as well as WMO and
+AWIPS Product IDs) along with relevant timestamps and expiration dates.
+
+=head1 EXAMPLE
+
+=cut
+
+use vars qw($VERSION $AUTOLOAD);
+$VERSION = "1.0.3";
 
 @ISA = qw(Weather::Product);
 @EXPORT = qw();
 @EXPORT_OK = qw();
 
 use Carp;
-use FileHandle;
-use LWP::UserAgent;
-use Time::Local;
 
 require Weather::WMO;
 require Weather::PIL;
 require Weather::UGC;
-require Weather::Product;
+require Weather::Product;	# VERSION >= 1.2.2
 
 sub initialize {
     my $self = shift;
+    $self->{PIL} = undef;
 }
 
 sub new {
@@ -42,7 +57,7 @@ sub parse {
 
     # allows us to update the same object
 
-    my $this = $self->{$count}++;
+    my $this = ++$self->{$count};
     $self->{data}->{$this}->{text} = "";
 
     foreach $line (split /\n/, $product)
@@ -53,7 +68,7 @@ sub parse {
             $self->{data}->{$this}->{text} .= $line."\n";
         }
 
-        if (($level==2) and ($line_last =~ m/\-$/)) {
+        if (($level) and ($line_last =~ m/\-$/)) {
             $line = $line_last . $line;
         }
 
@@ -63,9 +78,10 @@ sub parse {
             );
             --$level;
         }
-        elsif (($level==2) and (Weather::UGC::valid($line)))
+        elsif (($level>0) and ($level<3) and (Weather::UGC::valid($line)))
         {
-            $that = $self->{count}++;
+
+            $that = ++$self->{count};
 
             $self->{data}->{$that}->{WMO} = $self->{WMO};
             $self->{data}->{$that}->{PIL} = $self->{PIL};
@@ -78,11 +94,11 @@ sub parse {
                 $self->add($_, $that);
             }
 
-            ++$level;
+            $level=3;
         }
         elsif (($level==1) and (Weather::PIL::valid($line)))
         {
-            my $that = $self->{count}++;
+            $that = ++$self->{count};
 
             $self->{data}->{$that}->{WMO} = $self->{WMO};
             $self->{data}->{$that}->{PIL} = new Weather::PIL($line);
@@ -118,30 +134,35 @@ sub parse {
         }
         $line_last = $line;
     }
+    $self->SUPER::purge();
 }
 
+sub purge {
+    my $self = shift;
+    my $class = ref($self) || $self;
 
-sub pointer { # given a zone, it returns a pointer to current product
+    my @purge_list = @_;
+
+    foreach ($self->products()) {
+        if (defined($self->expires($_))) {
+            if ($self->expires($_)<=time) {
+                push @purge_list, $_;
+            }
+        }
+    }
+
+    $self->SUPER::purge(@purge_list);
+}
+
+sub expires {
     my $self = shift;
     my $id = shift;
 
-    my $field = shift;
-    my $ptr;
-
-    unless (defined($id)) {
-        return undef;
-    }
-    $ptr = $self->{products}->{$id};
-
-    if (defined($self->{data}->{$ptr}))
-    {
-        if (defined($field)) {
-            return $self->{data}->{$ptr}->{$field};
-        } else {
-            return $self->{data}->{$ptr};
-        }
-    } else
-    {
+    my $UGC = $self->pointer($id, 'UGC');
+   
+    if (defined($UGC)) {
+        return Weather::Product::int_time( $UGC->expires );
+    } else {
         return undef;
     }
 }
@@ -150,21 +171,25 @@ sub text {
     my $self = shift;
     my $id = shift;
 
-    my $ptr = $self->{products}->{$id};
+    my $ptr = $self->pointer($id);
 
-    unless (defined($self->{data}->{$ptr}->{text})) {
+    unless (defined($ptr->{text}))
+    {
         my $start = 0, $len;
 
-        $start = $self->{data}->{$ptr}->{start};
+        $start = $ptr->{start};
 
-        $len = $self->{data}->{$ptr}->{len};
-        unless (defined($len)) { $len = 999999; }
+        $len = $ptr->{len};
+        unless (defined($len))
+        {
+            $len = 999999;	# weather products are never this long
+        }
 
-        $ptr = $self->{data}->{$ptr}->{ptr};
+        $ptr = $ptr->{ptr};
 
         return substr($self->{data}->{$ptr}->{text}, $start, $len);
     }
-    return $self->{data}->{$ptr}->{text};
+    return $ptr->{text};
 }
 
 sub AUTOLOAD {
@@ -174,6 +199,16 @@ sub AUTOLOAD {
 
     my $name = $AUTOLOAD;
     $name =~ s/.*://;   # strip fully-qualified portion
+
+    if (grep(/^$name$/,	# settable (global) properties
+        qw(max_age)
+    )) {
+        if (@_) {
+            return $self->{$name} = shift;
+        } else {
+            return $self->{$name};
+        }
+    }
 
     if (grep(/^$name$/,
         qw(WMO PIL UGC)
@@ -189,6 +224,38 @@ sub AUTOLOAD {
 
 }
 
-
 1;
+
+__END__
+
+=pod
+
+=head1 KNOWN BUGS
+
+This version of the module does not (yet) handle addendums or multi-part
+weather products.
+
+Other issues with returning the I<time> are are a limitation of the WMO
+header format, not this module.
+
+=head1 SEE ALSO
+
+F<Weather::WMO>, F<Weather::PIL>, F<Weather::UGC> and F<Weather::Product>.
+
+Perusing documentation on the format of WMO-style weather products online from
+the U.S. National Weather Service http://www.nws.noaa.gov may also be of help.
+
+=head1 DISCLAIMER
+
+I am not a meteorologist nor am I associated with any weather service.
+This module grew out of a hack which would fetch weather reports every
+morning and send them to my pager. So I said to myself "Why not do this
+the I<right> way..." and spent a bit of time surfing around the web
+looking for documentation about this stuff....
+
+=head1 AUTHOR
+
+Robert Rothenberg <wlkngowl@unix.asb.com>
+
+=cut
 

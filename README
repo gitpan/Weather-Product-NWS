@@ -9,6 +9,9 @@ modules, respectively.
 
 Required Modules:
 	Carp
+      FileHandle
+      LWP::UserAgent
+      Time::Local
 	Weather::PIL
 	Weather::Product
 	Weather::UGC
